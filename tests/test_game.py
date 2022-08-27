@@ -23,15 +23,15 @@ def test_game_play_card(hanabi_game: Hanabi, players: List[Player]):
     Player should be able to play a card, if the card can be part of the pile
     no bomb point is get, otherwise, the bomb point is increased
     """
-    card = hanabi_game.play_card(1)
+    card = hanabi_game.play_card(0)
 
     assert hanabi_game.get_player_cards(players[0])[1] is not card
     assert len(hanabi_game.get_player_cards(players[0])) == 5
     assert hanabi_game.points == 1
-    assert len(hanabi_game.piles[Color.GREEN]) == 1
+    assert len(hanabi_game.piles[Color.BLUE]) == 1
     assert hanabi_game.bombs == 0
 
-    assert hanabi_game.piles[Color.GREEN][0] is card
+    assert hanabi_game.piles[Color.BLUE][0] is card
 
     card = hanabi_game.play_card(0)
 
@@ -43,9 +43,9 @@ def test_game_play_card(hanabi_game: Hanabi, players: List[Player]):
 
 def test_game_over_by_bombs(hanabi_game: Hanabi, players: List[Player]):
     """The game cannot continue if the bomb points reach max bombs"""
-    hanabi_game.play_card(2)
+    hanabi_game.play_card(3)
     hanabi_game.play_card(0)
-    hanabi_game.play_card(0)
+    hanabi_game.play_card(1)
 
     assert hanabi_game.bombs == 3
     assert not hanabi_game.is_alive()
@@ -102,20 +102,26 @@ def test_extra_clue_by_playing_last_pile_card(hanabi_game: Hanabi):
     hanabi_game._clues = 7
 
     for i in range(1, 5):
-        hanabi_game.piles[Color.WHITE].append(Card(number=i, color=Color.WHITE))
+        hanabi_game.piles[Color.RED].append(Card(number=i, color=Color.RED))
     
-    hanabi_game.play_card(0)
+    for _ in range(13):
+        hanabi_game.discard_card(0)
+    
+    hanabi_game.play_card(4)
 
-    assert len(hanabi_game.piles[Color.WHITE])
+    assert len(hanabi_game.piles[Color.RED])
     assert hanabi_game.clues == 8
 
 
 def test_gain_bomb_by_playing_in_full_pile(hanabi_game: Hanabi):
     """The players should get a bomb point by playing a card into a full pile"""
     for i in range(1, 6):
-        hanabi_game.piles[Color.WHITE].append(Card(number=i, color=Color.WHITE))
+        hanabi_game.piles[Color.RED].append(Card(number=i, color=Color.RED))
     
-    hanabi_game.play_card(0)
+    for _ in range(13):
+        hanabi_game.discard_card(0)
+    
+    hanabi_game.play_card(4)
 
     assert hanabi_game.bombs == 1
 
@@ -151,10 +157,10 @@ def test_give_clue(hanabi_game: Hanabi, players: List[Player]):
     assert hanabi_game.clues == 7
     
     player_clues = hanabi_game.get_player_clues(player_b)
-    assert all(player_clues[i].number == 3 for i in [0, 2, 3])
-    assert all(player_clues[i].color is None for i in [0, 2, 3])
-    assert all(player_clues[i].number is None for i in [1, 4])
-    assert all(player_clues[i].color is None for i in [1, 4])
+    assert all(player_clues[i].number == 3 for i in [0, 1, 2])
+    assert all(player_clues[i].color is None for i in [0, 1, 2])
+    assert all(player_clues[i].number is None for i in [3, 4])
+    assert all(player_clues[i].color is None for i in [3, 4])
 
     with pytest.raises(CannotGiveClueToYourself):
         hanabi_game.give_clue(player_b, Clue(color=Color.RED))
@@ -163,10 +169,10 @@ def test_give_clue(hanabi_game: Hanabi, players: List[Player]):
 
     hanabi_game.give_clue(player_b, Clue(color=Color.YELLOW))
 
-    assert player_clues[0].number == 3 and player_clues[0].color is None
-    assert player_clues[1].number is None and player_clues[1].color is Color.YELLOW
+    assert player_clues[0].number == 3 and player_clues[0].color is Color.YELLOW
+    assert player_clues[1].number == 3 and player_clues[1].color is None
     assert player_clues[2].number == 3 and player_clues[2].color is None
-    assert player_clues[3].number == 3 and player_clues[3].color is Color.YELLOW
+    assert player_clues[3].number is None and player_clues[3].color is Color.YELLOW
     assert player_clues[4].number is None and player_clues[4].color is None
 
     assert hanabi_game.clues == 7

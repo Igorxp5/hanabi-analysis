@@ -2,11 +2,12 @@ import random
 
 from typing import Tuple, Dict, List
 
+from .interface import HanabiInterface
 from .models import Color, Card, Clue, Player
 from .exceptions import NoClueEnough, InvalidCard, GameOver, CannotGiveClueToYourself
 
 
-class Hanabi:
+class Hanabi(HanabiInterface):
     def __init__(self, cards_set: Tuple[Card], clues_set: Tuple[Clue], players: Tuple[Player], 
                  initial_hand_size: int, max_clues: int = 8, max_bombs: int = 3):
                 self._cards_set = cards_set
@@ -28,7 +29,6 @@ class Hanabi:
                 self._clues = self._max_clues
                 self._bombs = 0
                 self._end_deck_countdown = 0
-                
 
     def start(self):
         self._deck = random.sample(self._cards_set, k=len(self._cards_set))
@@ -51,39 +51,43 @@ class Hanabi:
         return self._players[self._current_player]
 
     @property
-    def clues(self):
+    def clues(self) -> int:
         return self._clues
     
     @property
-    def bombs(self):
+    def bombs(self) -> int:
         return self._bombs
     
     @property
-    def points(self):
+    def points(self) -> int:
         return sum(len(pile) for pile in self._piles.values())
 
     @property
-    def piles(self):
+    def piles(self) -> Dict[Color, List[Card]]:
         return self._piles
     
     @property
-    def discard_zone(self):
+    def discard_zone(self) -> Dict[Card, int]:
         return self._discard_zone
     
     @property
-    def max_points(self):
+    def max_points(self) -> int:
         return self._max_points
+    
+    @property
+    def total_deck_cards(self) -> int:
+        return len(self._deck)
 
-    def has_clues(self):
+    def has_clues(self) -> bool:
         return self._clues > 0
     
-    def has_cards_in_deck(self):
-        return len(self._deck) > 0
+    def has_cards_in_deck(self) -> bool:
+        return self.total_deck_cards > 0
     
-    def has_won(self):
+    def has_won(self) -> bool:
         return self.points == self._max_points
 
-    def is_alive(self):
+    def is_alive(self) -> bool:
         return self._bombs < self._max_bombs and (self._deck or self._end_deck_countdown >= 0) \
             and not self.has_won()
 
@@ -114,7 +118,7 @@ class Hanabi:
         self._next_turn()
     
     @_alive_game
-    def discard_card(self, index: int):
+    def discard_card(self, index: int) -> Card:
         card = self._player_hands[self.current_player][index]
 
         self._pop_player_card(self.current_player, card)
@@ -125,22 +129,21 @@ class Hanabi:
         if self.has_cards_in_deck():
             self._player_draw(self.current_player)
         
-        if self._clues < self._max_clues:
-            self._clues += 1
+        self._gain_clue()
 
         self._next_turn()
 
         return card
 
     @_alive_game
-    def play_card(self, index: int):
+    def play_card(self, index: int) -> Card:
         card = self._player_hands[self.current_player][index]
 
         self._pop_player_card(self.current_player, card)
 
         if self._add_card_in_pile(card):
             if len(self._piles[card.color]) == self._unique_cards_by_color:
-                self._clues += 1
+                self._gain_clue()
         else:
             self._bombs += 1
 
@@ -151,20 +154,23 @@ class Hanabi:
         self._next_turn()
         
         return card
-    
-    def get_player_cards(self, player: Player):
+
+    def get_player_cards(self, player: Player) -> List[Card]:
         return self._player_hands[player]
     
-    def get_player_clues(self, player: Player):
+    def get_player_clues(self, player: Player) -> List[Clue]:
         return self._player_clues[player]
 
-    def _add_card_in_pile(self, card: Card):
+    def _add_card_in_pile(self, card: Card) -> bool:
         if len(self._piles[card.color]) < self._unique_cards_by_color \
                 and card.number == len(self._piles[card.color]) + 1:
             self._piles[card.color].append(card)
             return True
         return False
-
+    
+    def _gain_clue(self):
+        if self._clues < self._max_clues:
+            self._clues += 1
     
     def _pop_player_card(self, player: Player, card: Card):
         try:
@@ -175,15 +181,14 @@ class Hanabi:
             self._player_clues[player].pop(card_index)
             self._player_hands[player].pop(card_index)
 
-    def _player_draw(self, player: Player):
+    def _player_draw(self, player: Player) -> Card:
         card = self._draw()
         self._player_hands[player].append(card)
         self._player_clues[player].append(Clue())
         return card
-    
 
     def _draw(self) -> Card:
-        card = self._deck.pop(random.randint(0, len(self._deck) - 1))
+        card = self._deck.pop(0)
         return card
 
     def _next_turn(self):
