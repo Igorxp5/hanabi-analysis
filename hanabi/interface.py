@@ -1,10 +1,10 @@
 import random
 
 from abc import ABC, abstractmethod
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Set
 
 from .models import Color, Card, Clue, Player
-from .exceptions import NoClueEnough, InvalidCard, GameOver, CannotGiveClueToYourself
+from .exceptions import GameOver
 
 
 class HanabiInterface(ABC):
@@ -44,7 +44,7 @@ class HanabiInterface(ABC):
     
     @property
     @abstractmethod
-    def discard_zone(self) -> Dict[Card, int]:
+    def discard_set(self) -> Set[Card]:
         raise NotImplementedError
     
     @property

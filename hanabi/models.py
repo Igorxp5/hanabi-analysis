@@ -5,15 +5,15 @@ from dataclasses import dataclass
 
 
 class Color(enum.Enum):
-    RED = 'red'
-    GREEN = 'green'
-    BLUE = 'blue'
-    YELLOW = 'yellow'
-    WHITE = 'white'
-    MULTI = 'multi'
+    RED = 0
+    GREEN = 1
+    BLUE = 2
+    YELLOW = 3
+    WHITE = 4
+    MULTI = 5
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=True, unsafe_hash=False)
 class Card:
     number: int = None
     color: Color = None
@@ -29,6 +29,12 @@ class Card:
     
     def __gt__(self, other):
         return self.number >= other.number
+
+    def __hash__(self):
+        return object.__hash__(self)
+    
+    def immutable_hash(self):
+        return hash((self.number, self.color))
 
 
 @dataclass

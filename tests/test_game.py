@@ -7,6 +7,8 @@ from hanabi.modes import NORMAL
 from hanabi.models import Player, Card, Clue, Color
 from hanabi.exceptions import CannotGiveClueToYourself, GameOver
 
+from agent import HanabiAgent
+
 
 def test_game_start(hanabi_game: Hanabi, players: List[Player]):
     """The players should receive the initial cards when the game starts"""
@@ -23,7 +25,7 @@ def test_game_play_card(hanabi_game: Hanabi, players: List[Player]):
     Player should be able to play a card, if the card can be part of the pile
     no bomb point is get, otherwise, the bomb point is increased
     """
-    card = hanabi_game.play_card(0)
+    card = hanabi_game.play_card(2)
 
     assert hanabi_game.get_player_cards(players[0])[1] is not card
     assert len(hanabi_game.get_player_cards(players[0])) == 5
@@ -43,9 +45,9 @@ def test_game_play_card(hanabi_game: Hanabi, players: List[Player]):
 
 def test_game_over_by_bombs(hanabi_game: Hanabi, players: List[Player]):
     """The game cannot continue if the bomb points reach max bombs"""
-    hanabi_game.play_card(3)
+    hanabi_game.play_card(4)
     hanabi_game.play_card(0)
-    hanabi_game.play_card(1)
+    hanabi_game.play_card(0)
 
     assert hanabi_game.bombs == 3
     assert not hanabi_game.is_alive()
@@ -157,10 +159,10 @@ def test_give_clue(hanabi_game: Hanabi, players: List[Player]):
     assert hanabi_game.clues == 7
     
     player_clues = hanabi_game.get_player_clues(player_b)
-    assert all(player_clues[i].number == 3 for i in [0, 1, 2])
-    assert all(player_clues[i].color is None for i in [0, 1, 2])
-    assert all(player_clues[i].number is None for i in [3, 4])
+    assert all(player_clues[i].number == 3 for i in [3, 4])
     assert all(player_clues[i].color is None for i in [3, 4])
+    assert all(player_clues[i].number is None for i in [0, 1, 2])
+    assert all(player_clues[i].color is None for i in [0, 1, 2])
 
     with pytest.raises(CannotGiveClueToYourself):
         hanabi_game.give_clue(player_b, Clue(color=Color.RED))
@@ -169,11 +171,11 @@ def test_give_clue(hanabi_game: Hanabi, players: List[Player]):
 
     hanabi_game.give_clue(player_b, Clue(color=Color.YELLOW))
 
-    assert player_clues[0].number == 3 and player_clues[0].color is Color.YELLOW
-    assert player_clues[1].number == 3 and player_clues[1].color is None
-    assert player_clues[2].number == 3 and player_clues[2].color is None
-    assert player_clues[3].number is None and player_clues[3].color is Color.YELLOW
-    assert player_clues[4].number is None and player_clues[4].color is None
+    assert player_clues[0].number is None and player_clues[0].color is None
+    assert player_clues[1].number is None and player_clues[1].color is None
+    assert player_clues[2].number is None and player_clues[2].color is Color.YELLOW
+    assert player_clues[3].number == 3 and player_clues[3].color is Color.YELLOW
+    assert player_clues[4].number is None and player_clues[4].color is Color.YELLOW
 
     assert hanabi_game.clues == 7
 
@@ -189,7 +191,7 @@ def test_discard_card(hanabi_game: Hanabi):
     assert hanabi_game.clues == 8
     assert len(player_cards) == 5
     assert player_cards[0] is not discarded_card
-    assert discarded_card in hanabi_game.discard_zone
+    assert discarded_card in hanabi_game.discard_set
 
     hanabi_game.give_clue(player, Clue(number=3))
 
@@ -198,4 +200,21 @@ def test_discard_card(hanabi_game: Hanabi):
     assert hanabi_game.clues == 8
     assert len(player_cards) == 5
     assert player_cards[0] is not discarded_card
-    assert discarded_card in hanabi_game.discard_zone
+    assert discarded_card in hanabi_game.discard_set
+
+
+def test_copy_hanabi_game(hanabi_game: Hanabi, players: List[Player]):
+    """
+    The method copy should create a clone of current game state.
+    Any action done in the second instance should not affect the first instance state.
+    """
+    state = HanabiAgent.get_game_state(hanabi_game)
+    hanabi_copy = hanabi_game.copy()
+
+    assert HanabiAgent.get_game_state(hanabi_copy).tobytes() == state.tobytes()
+
+    hanabi_copy.discard_card(0)
+    hanabi_copy.play_card(0)
+    hanabi_copy.give_clue(players[1], Clue(number=1))
+
+    assert HanabiAgent.get_game_state(hanabi_game).tobytes() == state.tobytes()
