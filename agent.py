@@ -1,3 +1,5 @@
+import logging
+
 from typing import Callable, Tuple, Iterable
 from functools import partial
 
@@ -5,11 +7,8 @@ import numpy as np
 
 import tensorflow as tf
 
-from hanabi.game import Hanabi
+from hanabi.game import CardState, Hanabi
 from hanabi.models import Player, Card, Clue
-
-STATE_EMPTY_CARD_SLOT = -1
-STATE_EMPTY_CLUE_SLOT = -2
 
 TrainingExample = Tuple[np.ndarray, np.ndarray, float]
 
@@ -31,14 +30,16 @@ class HanabiAgent:
         self._state_shape = HanabiAgent.get_game_state(hanabi_game, players[0]).shape
         self._actions_shape = HanabiAgent.get_actions_shape(hanabi_game)
 
+        logging.debug(f'Game state shape: {self._state_shape}')
+
         model_input = tf.keras.layers.Input(shape=self._state_shape)
 
-        hidden_layer_1 = tf.keras.layers.Dense(units=360, activation='relu')(model_input)
-        hidden_layer_2 = tf.keras.layers.Dense(units=180, activation='relu')(hidden_layer_1)
-        hidden_layer_2 = tf.keras.layers.Dense(units=90, activation='relu')(hidden_layer_1)
+        hidden_layer_1 = tf.keras.layers.Dense(units=1024, activation='relu')(model_input)
+        hidden_layer_2 = tf.keras.layers.Dense(units=512, activation='relu')(hidden_layer_1)
+        hidden_layer_3 = tf.keras.layers.Dense(units=256, activation='relu')(hidden_layer_2)
 
-        self._policy = tf.keras.layers.Dense(self._actions_shape[0], activation='softmax', name='policy')(hidden_layer_2)
-        self._state_value = tf.keras.layers.Dense(1, activation='tanh', name='state_value')(hidden_layer_2)
+        self._policy = tf.keras.layers.Dense(self._actions_shape[0], activation='softmax', name='policy')(hidden_layer_3)
+        self._state_value = tf.keras.layers.Dense(1, activation='tanh', name='state_value')(hidden_layer_3)
 
         self._model = tf.keras.models.Model(inputs=model_input, outputs=[self._policy, self._state_value])
         self._model.compile(loss=['categorical_crossentropy','mean_squared_error'], optimizer=tf.keras.optimizers.Adam(learning_rate))
@@ -46,6 +47,10 @@ class HanabiAgent:
         self.batch_size = batch_size
         self.epochs = epochs
     
+    @property
+    def metrics(self):
+        return self._model.metrics
+
     def train(self, examples: Iterable[TrainingExample], fit_callback=None):
         states, policies, rewards = list(zip(*examples))
         states = np.asarray(states)
@@ -118,49 +123,41 @@ class HanabiAgent:
     def get_game_state(hanabi_game: Hanabi, player_perspective: Player = None) -> np.ndarray:
         if player_perspective:
             player_perspective = hanabi_game.current_player
-
-        cards_states_length = len(hanabi_game._cards_set)
-        other_players_cards_length = (len(hanabi_game._players) - 1) * hanabi_game._initial_hand_size * 2
-        player_clues_length = len(hanabi_game._players) * hanabi_game._initial_hand_size * 2
-        available_clues_length = 1
-        bombs_length = 1
-
-        state_length = cards_states_length + other_players_cards_length + player_clues_length \
-            + available_clues_length + bombs_length
-
-        state = np.zeros(state_length)
-        index = 0
         
-        for card in hanabi_game._cards_set:
-            state[index] = hanabi_game._cards_state[card].value
-            index += 1
+        deck_cards = np.zeros(shape=(len(hanabi_game._cards_set), 3))  # NOT_PLAYED, PLAYED, DISCARDED
+        
+        card_states = list(CardState)
+        for i, card in enumerate(hanabi_game._cards_set):
+            state_index = card_states.index(hanabi_game._cards_state[card])
+            deck_cards[i][state_index] = 1
 
-        for player in hanabi_game.other_players:
+        total_other_players = len(hanabi_game._players) - 1
+        other_players_cards = np.zeros(shape=(total_other_players, hanabi_game._initial_hand_size,
+                                              hanabi_game._unique_cards_by_color, len(hanabi_game._colors), 1))
+        
+        for p, player in enumerate(hanabi_game.other_players):
             player_cards = hanabi_game.get_player_cards(player)
-            for j in range(hanabi_game._initial_hand_size):
-                card_number = STATE_EMPTY_CARD_SLOT
-                card_color = STATE_EMPTY_CARD_SLOT
-                if j < len(player_cards):
-                    card_number = player_cards[j].number
-                    card_color = player_cards[j].color.value
-                state[index] = card_number
-                state[index + 1] = card_color
-                index += 2
+            for h, card in enumerate(player_cards):
+                card_number_index = card.number - 1
+                color_index = hanabi_game._colors.index(card.color)
+                other_players_cards[p][h][card_number_index][color_index] = 1
 
-        for player in hanabi_game._players:
+        players_clues = np.zeros(shape=(len(hanabi_game._players), hanabi_game._initial_hand_size,
+                                        hanabi_game._unique_cards_by_color, len(hanabi_game._colors), 1))
+        
+        for p, player in enumerate(hanabi_game._players):
             player_clues = hanabi_game.get_player_clues(player)
-            for j in range(hanabi_game._initial_hand_size):
-                clue_number = STATE_EMPTY_CARD_SLOT
-                clue_color = STATE_EMPTY_CARD_SLOT
-                if j < len(player_clues):
-                    clue_number = player_clues[j].number
-                    clue_number = clue_number if clue_number is not None else STATE_EMPTY_CLUE_SLOT
-                    clue_color = player_clues[j].color
-                    clue_color = clue_color.value if clue_color is not None else STATE_EMPTY_CLUE_SLOT
-                state[index] = clue_number
-                state[index + 1] = clue_color
-                index += 2
-        state[index] = hanabi_game.clues
-        state[index + 1] = hanabi_game.bombs
+            for h, clue in enumerate(player_clues):
+                players_clues[p][h] = 1  # There's a card in the current slot
+                if clue.number is not None:
+                    clue_number_index = clue.number - 1
+                    players_clues[p][h][:clue_number_index] = 0
+                    players_clues[p][h][clue_number_index + 1:] = 0
+                if clue.color is not None:
+                    clue_color_index = hanabi_game._colors.index(card.color)
+                    players_clues[p][h][:][:clue_color_index] = 0
+                    players_clues[p][h][:][clue_color_index + 1:] = 0
+        
+        current_clues_bombs = np.array([hanabi_game.clues, hanabi_game.bombs])
 
-        return state
+        return np.concatenate((deck_cards, other_players_cards, players_clues, current_clues_bombs), axis=None)

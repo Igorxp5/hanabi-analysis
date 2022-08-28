@@ -12,7 +12,7 @@ from .exceptions import NoClueEnough, InvalidCard, GameOver, CannotGiveClueToYou
 class CardState(enum.Enum):
     NOT_PLAYED = 0
     PLAYED = 1
-    DISCARDED = -1
+    DISCARDED = 2
 
 
 class Hanabi(HanabiInterface):
@@ -210,7 +210,8 @@ class Hanabi(HanabiInterface):
 
         hanabi_copy._piles = {color: cards.copy() for color, cards in self._piles.items()}
         hanabi_copy._player_hands = {player: cards.copy() for player, cards in self._player_hands.items()}
-        
+        hanabi_copy._player_clues = {player: [] for player in self._player_clues}
+
         for player in self._player_clues:
             for clue in self._player_clues[player]:
                 hanabi_copy._player_clues[player].append(dataclasses.replace(clue))
