@@ -1,11 +1,12 @@
 from typing import List
 
 import pytest
+import colorama
 
 from hanabi.game import Hanabi
-from hanabi.modes import NORMAL
 from hanabi.models import Player, Card, Clue, Color
 from hanabi.exceptions import CannotGiveClueToYourself, GameOver
+from hanabi.logging import hanabi_game_str
 
 from agent import HanabiAgent
 
@@ -218,3 +219,25 @@ def test_copy_hanabi_game(hanabi_game: Hanabi, players: List[Player]):
     hanabi_copy.give_clue(players[1], Clue(number=1))
 
     assert HanabiAgent.get_game_state(hanabi_game).tobytes() == state.tobytes()
+
+
+def test_game_state_print(hanabi_game: Hanabi, players: List[Player]):
+    """
+    The method logging.hanabi_game_str should show in the terminal current state of the game.
+    This method doesn't assert anything.
+    """
+    colorama.init()
+
+    print(hanabi_game_str(hanabi_game))
+
+    hanabi_game.play_card(2)
+
+    print(hanabi_game_str(hanabi_game))
+    
+    hanabi_game.discard_card(0)
+
+    print(hanabi_game_str(hanabi_game))
+    
+    hanabi_game.give_clue(players[1], Clue(color=Color.RED))
+
+    print(hanabi_game_str(hanabi_game))

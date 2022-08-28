@@ -70,8 +70,10 @@ class Hanabi(HanabiInterface):
     @property
     def other_players(self) -> Player:
         other_players = list(self._players)
-        other_players.remove(self.current_player)
-        return other_players
+        player_index = other_players.index(self.current_player)
+
+        # Show the other players in the right order of playing
+        return other_players[player_index + 1:] + other_players[:player_index]
 
     @property
     def clues(self) -> int:
@@ -159,6 +161,11 @@ class Hanabi(HanabiInterface):
             self._cards_state[card] = CardState.PLAYED
         else:
             self._bombs += 1
+
+            card_hash = card.immutable_hash()
+            self._discard_count.setdefault(card_hash, 0)
+            self._discard_count[card_hash] += 1
+            self._discard_set.add(card)
             self._cards_state[card] = CardState.DISCARDED
 
         if self.is_alive():

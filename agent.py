@@ -33,8 +33,9 @@ class HanabiAgent:
 
         model_input = tf.keras.layers.Input(shape=self._state_shape)
 
-        hidden_layer_1 = tf.keras.layers.Dense(units=1024, activation='relu')(model_input)
-        hidden_layer_2 = tf.keras.layers.Dense(units=512, activation='relu')(hidden_layer_1)
+        hidden_layer_1 = tf.keras.layers.Dense(units=360, activation='relu')(model_input)
+        hidden_layer_2 = tf.keras.layers.Dense(units=180, activation='relu')(hidden_layer_1)
+        hidden_layer_2 = tf.keras.layers.Dense(units=90, activation='relu')(hidden_layer_1)
 
         self._policy = tf.keras.layers.Dense(self._actions_shape[0], activation='softmax', name='policy')(hidden_layer_2)
         self._state_value = tf.keras.layers.Dense(1, activation='tanh', name='state_value')(hidden_layer_2)
@@ -45,15 +46,16 @@ class HanabiAgent:
         self.batch_size = batch_size
         self.epochs = epochs
     
-    def train(self, examples: Iterable[TrainingExample], verbose=None):
+    def train(self, examples: Iterable[TrainingExample], fit_callback=None):
         states, policies, rewards = list(zip(*examples))
         states = np.asarray(states)
         policies = np.asarray(policies)
         rewards = np.asarray(rewards)
 
+        callbacks = [fit_callback] if fit_callback else []
         self._model.fit(x=states, y=[policies, rewards], batch_size=self.batch_size,
-                        epochs=self.epochs, verbose=verbose)
-    
+                        epochs=self.epochs, verbose=0, callbacks=callbacks)
+
     def act(self, hanabi_game: Hanabi):
         policy = self.get_policy(hanabi_game)
         return HanabiAgent.get_policy_action_function(hanabi_game, policy)()

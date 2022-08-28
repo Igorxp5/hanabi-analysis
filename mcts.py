@@ -67,7 +67,7 @@ class HanabiMcts:
     
     def get_state_value(self, hanabi_game: Hanabi):
         if hanabi_game.is_alive():
-            return hanabi_game.points * 0.7 - hanabi_game.bombs * 0.25 - hanabi_game.turn * 0.05
+            return (hanabi_game.points / hanabi_game.max_points) - (hanabi_game.bombs / hanabi_game._max_bombs)
         return self._agent.get_estimated_reward(hanabi_game)
 
     def _select_action_by_ucb(self, hanabi_game: Hanabi) -> np.ndarray:
